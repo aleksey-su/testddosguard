@@ -1,25 +1,28 @@
 package storage
 
 import (
+	"log"
 	"math/big"
 	"net"
 	"sync"
+	"time"
 )
 
 type Package struct {
-	Domain string
-	IP     string
-	TTL    string
+	Domain string `msgpack:"domain"`
+	IP     string `msgpack:"ip"`
 }
 
 type Storage struct {
-	data map[string]uint32
-	mu   sync.Mutex
+	data   map[string]uint32
+	mu     sync.Mutex
+	ticker *time.Ticker
 }
 
 func NewStorage() *Storage {
 	return &Storage{
-		data: make(map[string]uint32),
+		data:   make(map[string]uint32),
+		ticker: time.NewTicker(10 * time.Second),
 	}
 }
 
@@ -27,12 +30,22 @@ func (s *Storage) Add(domain, IPv4String string) {
 	defer s.mu.Unlock()
 	s.mu.Lock()
 
-	IPv4Int := uint32(IP4toInt(IPv4String))
-	s.data[domain] = IPv4Int
+	select {
+	case <-s.ticker.C:
+		log.Printf("add %s %s", domain, IPv4String)
+		IPv4Int := uint32(IP4toInt(IPv4String))
+		s.data[domain] = IPv4Int
+	default:
+		return
+	}
 }
 
 func (s *Storage) GetAll() map[string]uint32 {
 	return s.data
+}
+
+func (s *Storage) StopTicker() {
+	s.ticker.Stop()
 }
 
 func IP4toInt(IPv4String string) uint64 {

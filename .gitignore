@@ -14,3 +14,5 @@
 .vscode
 */tcpclient/tcpclient
 */testddosguard/testddosguard
+.env
+*.py

@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/signal"
 	"storage"
-	"strconv"
 	"strings"
 	"syscall"
 	"tcpserver"
@@ -35,6 +34,7 @@ func main() {
 		r := bufio.NewReader(conn)
 		w := bufio.NewWriter(conn)
 		scanr := bufio.NewScanner(r)
+		// scanr.Split(bufio.ScanBytes)
 
 		sc := make(chan bool)
 		deadline := time.After(conn.IdleTimeout)
@@ -52,30 +52,25 @@ func main() {
 					}
 					return nil
 				}
-				// log.Println(scanr.Text())
+
+				t := scanr.Text()
+				b := scanr.Bytes()
+				// log.Println(t)
+				// log.Println(b)
 
 				var item storage.Package
 
-				err := msgpack.Unmarshal(scanr.Bytes(), &item)
+				err := msgpack.Unmarshal(b, &item)
 				if err != nil {
-					log.Println(err)
+					log.Printf("Bad request %s", t)
 					w.WriteString(strings.ToUpper("BAD") + "\n")
 					w.Flush()
 					continue
 				}
 
-				ttl, err := strconv.Atoi(item.TTL)
+				// log.Println(item)
 
-				if err != nil {
-					log.Println(err)
-					w.WriteString(strings.ToUpper("BAD") + "\n")
-					w.Flush()
-					continue
-				}
-
-				if ttl == 10 {
-					st.Add(item.Domain, item.IP)
-				}
+				st.Add(item.Domain, item.IP)
 
 				w.WriteString(strings.ToUpper("OK") + "\n")
 				w.Flush()
@@ -113,6 +108,7 @@ func main() {
 	log.Println("Shutdown Server ...")
 
 	srv.Shutdown()
+	st.StopTicker()
 
 	log.Println("Server exiting")
 
