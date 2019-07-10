@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -88,14 +87,7 @@ func main() {
 		}
 	}()
 
-	go func() {
-		for {
-			for k, v := range st.GetAll() {
-				fmt.Printf("%s %d %s\n", k, v, storage.InttoIPv4(v).String())
-			}
-			time.Sleep(time.Second)
-		}
-	}()
+	go st.Print()
 
 	// Wait for interrupt signal to gracefully shutdown the server with
 	// a timeout of 5 seconds.
@@ -108,7 +100,6 @@ func main() {
 	log.Println("Shutdown Server ...")
 
 	srv.Shutdown()
-	st.StopTicker()
 
 	log.Println("Server exiting")
 

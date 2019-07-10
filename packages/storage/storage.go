@@ -13,16 +13,20 @@ type Package struct {
 	IP     string `msgpack:"ip"`
 }
 
+type StoredPackage struct {
+	Domain string
+	IP     uint32
+	TTL    uint8
+}
+
 type Storage struct {
-	data   map[string]uint32
-	mu     sync.Mutex
-	ticker *time.Ticker
+	data map[*StoredPackage]struct{}
+	mu   sync.Mutex
 }
 
 func NewStorage() *Storage {
 	return &Storage{
-		data:   make(map[string]uint32),
-		ticker: time.NewTicker(10 * time.Second),
+		data: make(map[*StoredPackage]struct{}),
 	}
 }
 
@@ -30,22 +34,35 @@ func (s *Storage) Add(domain, IPv4String string) {
 	defer s.mu.Unlock()
 	s.mu.Lock()
 
-	select {
-	case <-s.ticker.C:
-		log.Printf("add %s %s", domain, IPv4String)
-		IPv4Int := uint32(IP4toInt(IPv4String))
-		s.data[domain] = IPv4Int
-	default:
-		return
+	log.Printf("add %s %s", domain, IPv4String)
+	IPv4Int := uint32(IP4toInt(IPv4String))
+	s.data[&StoredPackage{
+		Domain: domain,
+		IP:     IPv4Int,
+		TTL:    10,
+	}] = struct{}{}
+}
+
+func (s *Storage) Print() []*StoredPackage {
+
+	ticker := time.NewTicker(time.Second)
+
+	for {
+		select {
+		case <-ticker.C:
+			s.mu.Lock()
+			for k, _ := range s.data {
+				log.Printf("domain: %s, ip: %d - %s, ttl: %d\n", k.Domain, k.IP, InttoIPv4(k.IP).String(), k.TTL)
+				k.TTL--
+				if k.TTL <= 0 {
+					delete(s.data, k)
+				}
+			}
+			s.mu.Unlock()
+		default:
+			continue
+		}
 	}
-}
-
-func (s *Storage) GetAll() map[string]uint32 {
-	return s.data
-}
-
-func (s *Storage) StopTicker() {
-	s.ticker.Stop()
 }
 
 func IP4toInt(IPv4String string) uint64 {
